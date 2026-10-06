@@ -20,6 +20,7 @@ export default function NewCelebrityPage() {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -55,6 +56,66 @@ export default function NewCelebrityPage() {
       [name]: type === "checkbox" ? checked : value,
     }));
   }
+  async function handleImageUpload(
+  e: React.ChangeEvent<HTMLInputElement>
+) {
+  const file = e.target.files?.[0];
+
+  if (!file) {
+    return;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    alert("Please select a valid image file.");
+    e.target.value = "";
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    alert("Image must be smaller than 5MB.");
+    e.target.value = "";
+    return;
+  }
+
+  setUploadingImage(true);
+
+  try {
+    const fileExtension =
+      file.name.split(".").pop()?.toLowerCase() || "jpg";
+
+    const filePath = `new/${crypto.randomUUID()}.${fileExtension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("celebrity-images")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("Image upload error:", uploadError);
+      alert(uploadError.message);
+      return;
+    }
+
+    const {
+      data: { publicUrl },
+    } = supabase.storage
+      .from("celebrity-images")
+      .getPublicUrl(filePath);
+
+    setForm((current) => ({
+      ...current,
+      imageUrl: publicUrl,
+    }));
+  } catch (error) {
+    console.error("Unexpected upload error:", error);
+    alert("Something went wrong while uploading the photo.");
+  } finally {
+    setUploadingImage(false);
+    e.target.value = "";
+  }
+}
 
   function createSlug(name: string) {
     return name
@@ -178,13 +239,50 @@ console.log("CURRENT SUPABASE USER ERROR:", userError);
                 placeholder="e.g. Los Angeles, California"
               />
 
-              <InputField
-                label="Profile Image URL"
-                name="imageUrl"
-                value={form.imageUrl}
-                onChange={handleChange}
-                placeholder="https://..."
-              />
+              {/* Profile Image */}
+<div>
+  <label className="mb-2 block text-sm font-medium">
+    Profile Image
+  </label>
+
+  <div className="space-y-4">
+    {/* Upload from computer */}
+    <label className="flex cursor-pointer items-center justify-center border border-dashed border-black/20 bg-black/[0.02] px-5 py-8 text-center transition hover:border-black/40 hover:bg-black/[0.04]">
+      <div>
+        <div className="text-sm font-semibold">
+          Upload Photo
+        </div>
+
+        <div className="mt-1 text-xs text-black/45">
+          JPG, JPEG, PNG or WebP · Maximum 5MB
+        </div>
+
+        <input
+  type="file"
+  accept="image/jpeg,image/png,image/webp"
+  onChange={handleImageUpload}
+  disabled={uploadingImage}
+  className="hidden"
+/>
+      </div>
+    </label>
+
+    {/* Image URL fallback */}
+    <div>
+      <label className="mb-2 block text-xs font-medium text-black/50">
+        Or use an image URL
+      </label>
+
+      <input
+        name="imageUrl"
+        value={form.imageUrl}
+        onChange={handleChange}
+        placeholder="https://..."
+        className="w-full border border-black/15 bg-white px-4 py-3.5 text-sm outline-none transition placeholder:text-black/30 focus:border-black"
+      />
+    </div>
+  </div>
+</div>
             </div>
 
             <div className="mt-5">
@@ -274,7 +372,8 @@ console.log("CURRENT SUPABASE USER ERROR:", userError);
           </section>
 
           {/* Social Links */}
-          <section className="rounded-2xl border border-black/10 bg-white p-6 lg:p-8">
+          <section className="rounded-2xl border border-black/10 bg-white p-6 lg:p-8">{uploadingImage ? "Uploading Photo..." : "Upload Photo"}
+          
             <SectionHeading
               title="Social Media"
               description="Add the celebrity's official social media profiles."
