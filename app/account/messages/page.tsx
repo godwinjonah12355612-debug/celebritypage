@@ -837,50 +837,91 @@ export default function MessagesPage() {
    */
 
   const createConversation = async () => {
-    if (!userId) return;
+  if (!userId) return;
 
-    const { data, error } = await supabase
-      .from("conversations")
-      .insert({
-        member_id: userId,
-        subject: "General Enquiry",
-        status: "open",
-      })
-      .select(
-        `
-          id,
-          member_id,
-          booking_id,
-          subject,
-          status,
-          last_message_at,
-          created_at
-        `,
-      )
-      .single();
+  // First, check whether this member already has a conversation
+  const { data: existingConversation, error: existingError } = await supabase
+    .from("conversations")
+    .select(`
+      id,
+      member_id,
+      booking_id,
+      subject,
+      status,
+      last_message_at,
+      created_at
+    `)
+    .eq("member_id", userId)
+    .maybeSingle();
 
-    if (error) {
-      console.error(
-        "Failed to create conversation:",
-        error,
+  if (existingError) {
+    console.error(
+      "Failed to check existing conversation:",
+      existingError,
+    );
+    return;
+  }
+
+  // If the member already has a conversation, use it
+  if (existingConversation) {
+    const conversation = existingConversation as Conversation;
+
+    setConversations((current) => {
+      const alreadyExists = current.some(
+        (item) => item.id === conversation.id,
       );
-      return;
-    }
 
-    const conversation = data as Conversation;
+      if (alreadyExists) {
+        return current;
+      }
 
-    setConversations((current) => [
-      conversation,
-      ...current.filter(
-        (item) => item.id !== conversation.id,
-      ),
-    ]);
+      return [conversation, ...current];
+    });
 
     setSelectedConversation(conversation);
     setMobileConversationOpen(true);
-    setMessages([]);
-  };
 
+    // Load the existing messages
+    await loadMessages(conversation, userId);
+
+    return;
+  }
+
+  // No conversation exists, so create the first and only one
+  const { data, error } = await supabase
+    .from("conversations")
+    .insert({
+      member_id: userId,
+      subject: "General Enquiry",
+      status: "open",
+    })
+    .select(`
+      id,
+      member_id,
+      booking_id,
+      subject,
+      status,
+      last_message_at,
+      created_at
+    `)
+    .single();
+
+  if (error) {
+    console.error("Failed to create conversation:", error);
+    return;
+  }
+
+  const conversation = data as Conversation;
+
+  setConversations((current) => [
+    conversation,
+    ...current.filter((item) => item.id !== conversation.id),
+  ]);
+
+  setSelectedConversation(conversation);
+  setMobileConversationOpen(true);
+  setMessages([]);
+};
   /*
    * ---------------------------------------------------------
    * MOBILE BACK

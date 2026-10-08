@@ -13,7 +13,6 @@ type Conversation = {
   last_message_at: string | null;
   created_at: string;
 };
-
 type Member = {
   id: string;
   full_name: string | null;
@@ -109,68 +108,114 @@ export default function MessagesClient({
    * LOAD CONVERSATIONS
    * ---------------------------------------------------------
    */
-
-  async function loadConversations() {
-    const { data, error } = await supabase
-      .from("conversations")
-      .select(`
-        id,
-        member_id,
-        booking_id,
-        subject,
-        status,
-        last_message_at,
-        created_at,
-        member:profiles!conversations_member_id_fkey(
-          id,
-          full_name,
-          display_name,
-          email
-        )
-      `)
-      .order("last_message_at", {
-        ascending: false,
-        nullsFirst: false,
-      })
-      .order("created_at", {
-        ascending: false,
-      });
-
-    if (error) {
-      console.error(
-        "CONVERSATIONS ERROR:",
-        error
-      );
-      return;
-    }
-
-    const mapped =
-      (data ?? []).map((conversation) => ({
-        ...conversation,
-        member: Array.isArray(
-          conversation.member
-        )
-          ? conversation.member[0] ?? null
-          : conversation.member,
-      })) as ConversationWithMember[];
-
-    setConversations(mapped);
-
-    setSelectedId((current) => {
-      if (
-        current &&
-        mapped.some(
-          (conversation) =>
-            conversation.id === current
-        )
-      ) {
-        return current;
-      }
-
-      return mapped[0]?.id ?? null;
+async function loadConversations() {
+  const {
+    data: conversationData,
+    error: conversationError,
+  } = await supabase
+    .from("conversations")
+    .select(`
+      id,
+      member_id,
+      booking_id,
+      subject,
+      status,
+      last_message_at,
+      created_at
+    `)
+    .order("last_message_at", {
+      ascending: false,
+      nullsFirst: false,
+    })
+    .order("created_at", {
+      ascending: false,
     });
+
+  if (conversationError) {
+    console.error(
+      "CONVERSATIONS ERROR:",
+      conversationError
+    );
+    return;
   }
 
+  const rawConversations =
+    conversationData ?? [];
+
+  const memberIds = Array.from(
+    new Set(
+      rawConversations.map(
+        (conversation) =>
+          conversation.member_id
+      )
+    )
+  );
+
+  let profiles: Member[] = [];
+
+  if (memberIds.length > 0) {
+    const {
+      data: profileData,
+      error: profileError,
+    } = await supabase
+      .from("profiles")
+      .select(`
+        id,
+        display_name,
+        full_name,
+        email
+      `)
+      .in("id", memberIds);
+
+    if (profileError) {
+      console.error(
+        "PROFILES ERROR:",
+        profileError
+      );
+    } else {
+      profiles =
+        (profileData ?? []) as Member[];
+    }
+  }
+
+  const mapped =
+    rawConversations.map(
+      (conversation) => {
+        const member =
+          profiles.find(
+            (profile) =>
+              profile.id ===
+              conversation.member_id
+          ) ?? null;
+
+        return {
+          ...conversation,
+          member,
+        };
+      }
+    ) as ConversationWithMember[];
+
+  console.log(
+    "MANAGEMENT CONVERSATIONS:",
+    mapped
+  );
+
+  setConversations(mapped);
+
+  setSelectedId((current) => {
+    if (
+      current &&
+      mapped.some(
+        (conversation) =>
+          conversation.id === current
+      )
+    ) {
+      return current;
+    }
+
+    return mapped[0]?.id ?? null;
+  });
+}
   /*
    * ---------------------------------------------------------
    * LOAD MESSAGES
@@ -865,21 +910,18 @@ export default function MessagesClient({
       day: "numeric",
     });
   }
+function getMemberName(
+  conversation: ConversationWithMember
+) {
+  return (
 
-  function getMemberName(
-    conversation: ConversationWithMember
-  ) {
-    return (
-      conversation.member
-        ?.display_name ||
-      conversation.member
-        ?.full_name ||
-      conversation.member
-        ?.email ||
-      "Member"
-    );
-  }
+    conversation.member?.display_name ||
+    conversation.member?.full_name ||
+    conversation.member?.email ||
+    "Member"
+  );
 
+}
   function getConversationPreview(
     conversation: ConversationWithMember
   ) {
@@ -1253,32 +1295,29 @@ export default function MessagesClient({
                             !isMemberMessage;
 
                           return (
+                            
                             <div
-                              key={
-                                message.id
-                              }
-                              className={`flex ${
-                                isManagementMessage
-                                  ? "justify-start"
-                                  : "justify-end"
-                              }`}
-                            >
-                              <div
-                                className={`flex max-w-[85%] flex-col sm:max-w-[70%] ${
-                                  isManagementMessage
-                                    ? "items-start"
-                                    : "items-end"
-                                }`}
-                              >
-                                <div className="mb-1 px-1 text-[10px] font-medium uppercase tracking-[0.12em] text-black/35">
-                                  {isManagementMessage
-                                    ? "Management"
-                                    : "Member"}{" "}
-                                  ·{" "}
-                                  {formatTime(
-                                    message.created_at
-                                  )}
-                                </div>
+  key={message.id}
+  className={`flex ${
+    isManagementMessage ? "justify-end" : "justify-start"
+  }`}
+>
+  <div
+    className={`flex max-w-[85%] flex-col sm:max-w-[70%] ${
+      isManagementMessage ? "items-end" : "items-start"
+    }`}
+  >
+    <div className="mb-1 flex items-center gap-2 px-1 text-[10px] font-medium uppercase tracking-[0.12em] text-black/40">
+      <span>
+        {isManagementMessage
+  ? "Management"
+  : getMemberName(selectedConversation)}
+      </span>
+
+      <span>·</span>
+
+      <span>{formatTime(message.created_at)}</span>
+    </div>
 
                                 <div
                                   className={`rounded-2xl px-4 py-3 text-sm leading-6 ${
