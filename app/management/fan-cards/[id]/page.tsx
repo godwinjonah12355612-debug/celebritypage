@@ -188,36 +188,47 @@ export default function FanCardDetailsPage() {
     );
     setNotes(fanCard.notes || "");
 
-    const {
-      data: memberData,
-      error: memberError,
-    } = await supabase
-      .from("profiles")
-      .select(`
-        id,
-        full_name,
-        display_name,
-        email,
-        phone,
-        country,
-        avatar_url,
-        role,
-        status
-      `)
-      .eq("id", fanCard.member_id)
-      .single();
+   const {
+  data: memberData,
+  error: memberError,
+} = await supabase
+  .from("profiles")
+  .select(`
+    id,
+    full_name,
+    display_name,
+    email,
+    phone,
+    country,
+    avatar_url,
+    role,
+    status
+  `)
+  .eq("id", fanCard.member_id)
+  .maybeSingle();
 
-    if (memberError) {
-      console.error(
-        "MEMBER PROFILE ERROR:",
-        memberError
-      );
-    }
+if (memberError) {
+  console.error("MEMBER PROFILE ERROR:", {
+    message: memberError.message,
+    details: memberError.details,
+    hint: memberError.hint,
+    code: memberError.code,
+    memberId: fanCard.member_id,
+  });
 
-    if (memberData) {
-      setMember(memberData as Member);
-    }
+  setMember(null);
+} else if (memberData) {
+  setMember(memberData as Member);
+} else {
+  console.warn(
+    "No profile found for fan card member:",
+    fanCard.member_id
+  );
 
+  setMember(null);
+}
+
+setLoading(false);
     setLoading(false);
   }
 
@@ -606,205 +617,257 @@ export default function FanCardDetailsPage() {
               {/* =================================================
                   ACTUAL FAN CARD
               ================================================== */}
-              <div className="relative mx-auto w-full max-w-[850px] overflow-hidden rounded-[20px] border-[5px] border-[#252525] bg-[#eeeeeb] shadow-2xl">
-                {/* SECURITY GRID BACKGROUND */}
-                <div
-                  className="absolute inset-0 opacity-60"
-                  style={{
-                    backgroundImage: `
-                      linear-gradient(rgba(0,0,0,.045) 1px, transparent 1px),
-                      linear-gradient(90deg, rgba(0,0,0,.045) 1px, transparent 1px)
-                    `,
-                    backgroundSize: "5px 5px",
-                  }}
-                />
+              {/* PREMIUM FAN MEMBERSHIP CARD */}
+<div className="relative mx-auto w-full max-w-[850px] overflow-hidden rounded-[24px] border border-[#c9a85b]/70 bg-[#071b16] text-white shadow-[0_25px_70px_rgba(0,0,0,0.25)]">
 
-                {/* SUBTLE SECURITY LINES */}
-                <div className="absolute inset-0 opacity-30">
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      backgroundImage:
-                        "repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,0,0,.035) 4px)",
-                    }}
-                  />
-                </div>
+  {/* Emerald and gold background */}
+  <div className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div className="absolute -right-24 -top-28 h-72 w-72 rounded-full bg-emerald-500/10 blur-3xl" />
 
-                <div className="relative p-4 sm:p-6 md:p-7">
-                  {/* TOP TITLE */}
-                  <div className="text-center">
-                    <h3 className="text-[clamp(18px,3vw,32px)] font-black tracking-tight text-[#555]">
-                      CELEBRITY MANAGEMENT
-                    </h3>
+    <div className="absolute -bottom-32 -left-20 h-72 w-72 rounded-full bg-yellow-500/10 blur-3xl" />
 
-                    <p className="mt-1 text-[clamp(8px,1.2vw,13px)] font-black uppercase tracking-[0.12em] text-[#b3362f]">
-                      OFFICIAL PREMIUM FAN CARD
-                    </p>
-                  </div>
+    <div
+      className="absolute inset-0 opacity-[0.09]"
+      style={{
+        backgroundImage:
+          "repeating-linear-gradient(135deg, transparent 0px, transparent 12px, #d6b568 13px, transparent 14px)",
+      }}
+    />
 
-                  {/* MAIN CARD CONTENT */}
-                  <div className="mt-5 grid grid-cols-[82px_minmax(0,1fr)_92px] gap-4 sm:grid-cols-[130px_minmax(0,1fr)_125px] sm:gap-6 md:mt-6">
-                    {/* LEFT PHOTO */}
-                    <div className="flex flex-col">
-                      <div className="aspect-[3/4] w-full overflow-hidden border-2 border-[#5d5d5d] bg-[#ddd]">
-                        {member?.avatar_url ? (
-                          <img
-                            src={member.avatar_url}
-                            alt={memberName}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-[#333] text-3xl font-black text-white">
-                            {memberName
-                              .charAt(0)
-                              .toUpperCase()}
-                          </div>
-                        )}
-                      </div>
+    <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-[#e4c77e] to-transparent" />
+  </div>
 
-                      {/* SIGNATURE */}
-                      <div className="mt-3 border-b border-[#777] pb-1 text-center">
-                        <span className="font-serif text-sm italic text-[#444]">
-                          {memberName
-                            .split(" ")[0]}
-                        </span>
-                      </div>
+  <div className="relative p-4 sm:p-6 md:p-8">
 
-                      <p className="mt-1 text-center text-[7px] font-semibold uppercase text-[#777] sm:text-[9px]">
-                        Authorized Signature
-                      </p>
-                    </div>
+    {/* CARD HEADER */}
+    <div className="flex items-center justify-between gap-3 border-b border-[#c9a85b]/30 pb-4 sm:pb-5">
 
-                    {/* INFORMATION */}
-                    <div className="min-w-0 pt-1">
-                      <p className="mb-3 text-center text-[9px] font-black uppercase tracking-[0.08em] text-[#b3362f] sm:text-[12px]">
-                        PRIVATE VIP ACCESS
-                        AUTHORIZATION
-                      </p>
+      <div className="flex min-w-0 items-center gap-3">
 
-                      <CardInfoRow
-                        label="NAME"
-                        value={memberName}
-                      />
+        {/* Brand emblem */}
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#d9bb70]/60 bg-gradient-to-br from-[#e8d49b] via-[#c9a85b] to-[#8f6b28] text-lg font-black text-[#071b16] shadow-lg sm:h-12 sm:w-12">
+          CM
+        </div>
 
-                      <CardInfoRow
-                        label="COUNTRY"
-                        value={
-                          member?.country ||
-                          "NIGERIA"
-                        }
-                      />
+        <div className="min-w-0">
+          <h3 className="text-xs font-black tracking-[0.12em] text-white sm:text-lg sm:tracking-[0.16em]">
+            CELEBRITY MANAGEMENT
+          </h3>
 
-                      <CardInfoRow
-                        label="MEMBERSHIP LEVEL"
-                        value={getLevelLabel(
-                          membershipLevel
-                        )}
-                      />
+          <p className="mt-1 text-[9px] font-semibold uppercase tracking-[0.2em] text-[#d8bd79] sm:text-[11px]">
+            Official Membership
+          </p>
+        </div>
+      </div>
 
-                      <CardInfoRow
-                        label="MEMBERSHIP STATUS"
-                        value={getStatusText(
-                          status
-                        )}
-                      />
+      {/* Membership badge */}
+      <div className="shrink-0 rounded-full border border-[#d5b86b]/50 bg-[#c9a85b]/10 px-2.5 py-1.5 text-[8px] font-bold uppercase tracking-wider text-[#f0d99a] sm:px-4 sm:text-[10px]">
+        {getLevelLabel(membershipLevel)}
+      </div>
+    </div>
 
-                      <CardInfoRow
-                        label="REG DATE"
-                        value={
-                          issueDate
-                            ? formatDate(
-                                issueDate
-                              )
-                            : "—"
-                        }
-                      />
+    {/* MAIN CARD CONTENT */}
+    <div className="mt-5 grid grid-cols-[76px_minmax(0,1fr)_76px] items-start gap-3 sm:mt-7 sm:grid-cols-[125px_minmax(0,1fr)_112px] sm:gap-6 md:grid-cols-[145px_minmax(0,1fr)_125px] md:gap-7">
 
-                      <CardInfoRow
-                        label="VALID TILL"
-                        value={
-                          expiryDate
-                            ? formatDate(
-                                expiryDate
-                              )
-                            : "—"
-                        }
-                      />
+      {/* MEMBER PHOTO */}
+      <div className="min-w-0">
+        <div className="overflow-hidden rounded-xl border-2 border-[#d3b568] bg-[#102d24] p-0.5 shadow-[0_0_20px_rgba(201,168,91,0.12)] sm:rounded-2xl">
 
-                      <CardInfoRow
-                        label="I.D. NO"
-                        value={card.membership_id}
-                      />
-                    </div>
-
-                    {/* RIGHT PHOTO + QR */}
-                    <div className="flex flex-col items-center">
-                      <div className="aspect-[4/5] w-full overflow-hidden border-2 border-[#5d5d5d] bg-[#ddd]">
-                        {member?.avatar_url ? (
-                          <img
-                            src={member.avatar_url}
-                            alt={memberName}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-[#333] text-2xl font-black text-white">
-                            {memberName
-                              .charAt(0)
-                              .toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-
-                      <p className="mt-2 text-center text-[6px] font-bold uppercase leading-tight text-[#555] sm:text-[8px]">
-                        SCAN THE QR CODE TO
-                        <br />
-                        VERIFY MEMBERSHIP
-                      </p>
-
-                      <div className="mt-1 flex h-[62px] w-[62px] items-center justify-center bg-white p-1 sm:h-[88px] sm:w-[88px]">
-                        <QRCodeSVG
-                          value={qrValue}
-                          size={80}
-                          bgColor="#ffffff"
-                          fgColor="#111111"
-                          level="H"
-                          includeMargin={false}
-                          className="h-full w-full"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* BOTTOM SECTION */}
-                  <div className="mt-5 border-t-2 border-[#777] pt-3 sm:mt-6 sm:pt-4">
-                    <div className="grid grid-cols-[55px_1fr] items-end gap-3 sm:grid-cols-[90px_1fr]">
-                      {/* CHIP */}
-                      <div>
-                        <div className="relative h-[34px] w-[48px] overflow-hidden rounded-[6px] border border-[#9b7b25] bg-gradient-to-br from-[#e4c768] via-[#cda83c] to-[#a77d20] shadow-inner sm:h-[45px] sm:w-[64px]">
-                          <div className="absolute left-1/2 top-0 h-full w-px bg-[#96751f]" />
-                          <div className="absolute left-0 top-1/2 h-px w-full bg-[#96751f]" />
-                          <div className="absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#96751f]" />
-                        </div>
-                      </div>
-
-                      {/* CERTIFICATION TEXT */}
-                      <p className="text-[7px] font-medium leading-[1.35] text-[#555] sm:text-[9px] md:text-[10px]">
-                        This is to certify that the
-                        above named person is an
-                        officially registered member
-                        of the Celebrity Management
-                        fan community and is entitled
-                        to the privileges associated
-                        with this membership.
-                      </p>
-                    </div>
-
-                    <div className="mt-2 text-center text-[7px] font-bold text-[#777] sm:text-[9px]">
-                      www.celebritymanagement.com
-                    </div>
-                  </div>
-                </div>
+          <div className="aspect-[3/4] overflow-hidden rounded-lg bg-[#102d24]">
+            {member?.avatar_url ? (
+              <img
+                src={member.avatar_url}
+                alt={memberName}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-900 to-black text-2xl font-bold text-[#e2c77f] sm:text-4xl">
+                {memberName.charAt(0).toUpperCase()}
               </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-2 text-center">
+          <p className="truncate text-[9px] font-bold uppercase tracking-wide text-white sm:text-xs">
+            {memberName.split(" ")[0]}
+          </p>
+
+          <p className="mt-1 text-[7px] uppercase tracking-wider text-[#c9a85b] sm:text-[9px]">
+            Cardholder
+          </p>
+        </div>
+      </div>
+
+      {/* MEMBER DETAILS */}
+      <div className="min-w-0 pt-1">
+
+        <p className="mb-3 text-[8px] font-bold uppercase tracking-[0.15em] text-[#d8bd79] sm:mb-5 sm:text-[10px]">
+          Membership Credentials
+        </p>
+
+        {/* Name */}
+        <div className="mb-3 border-b border-white/10 pb-2 sm:mb-4 sm:pb-3">
+          <p className="text-[7px] font-semibold uppercase tracking-[0.16em] text-white/45 sm:text-[9px]">
+            Full Name
+          </p>
+
+          <p className="mt-1 break-words text-xs font-bold leading-snug text-white sm:text-base md:text-lg">
+            {memberName}
+          </p>
+        </div>
+
+        {/* Membership ID */}
+        <div className="mb-3 border-b border-white/10 pb-2 sm:mb-4 sm:pb-3">
+          <p className="text-[7px] font-semibold uppercase tracking-[0.16em] text-white/45 sm:text-[9px]">
+            Membership Number
+          </p>
+
+          <p className="mt-1 break-all font-mono text-[10px] font-bold tracking-wide text-[#e4ca83] sm:text-sm">
+            {card.membership_id}
+          </p>
+        </div>
+
+        {/* Country */}
+        <div className="mb-3 sm:mb-4">
+          <p className="text-[7px] font-semibold uppercase tracking-[0.16em] text-white/45 sm:text-[9px]">
+            Country
+          </p>
+
+          <p className="mt-1 break-words text-[10px] font-semibold uppercase text-white/90 sm:text-xs">
+            {member?.country || "Nigeria"}
+          </p>
+        </div>
+
+        {/* Dates */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
+
+          <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2 sm:p-3">
+            <p className="text-[7px] font-semibold uppercase tracking-wider text-white/45 sm:text-[9px]">
+              Valid From
+            </p>
+
+            <p className="mt-1 text-[9px] font-semibold text-white sm:text-xs">
+              {issueDate ? formatDate(issueDate) : "—"}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-white/10 bg-white/[0.04] p-2 sm:p-3">
+            <p className="text-[7px] font-semibold uppercase tracking-wider text-white/45 sm:text-[9px]">
+              Valid Until
+            </p>
+
+            <p className="mt-1 text-[9px] font-semibold text-white sm:text-xs">
+              {expiryDate ? formatDate(expiryDate) : "—"}
+            </p>
+          </div>
+
+        </div>
+      </div>
+
+      {/* PHOTO AND QR CODE */}
+      <div className="flex min-w-0 flex-col items-center">
+
+        {/* Existing photo logic preserved */}
+        <div className="w-full overflow-hidden rounded-xl border border-[#c9a85b]/70 bg-[#102d24] p-0.5 sm:rounded-2xl">
+
+          <div className="aspect-[4/5] overflow-hidden rounded-lg">
+            {member?.avatar_url ? (
+              <img
+                src={member.avatar_url}
+                alt={memberName}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-emerald-900 to-black text-xl font-bold text-[#e2c77f] sm:text-3xl">
+                {memberName.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <p className="mt-2 text-center text-[7px] font-bold uppercase tracking-wider text-[#d8bd79] sm:text-[9px]">
+          Verify Membership
+        </p>
+
+        {/* QR code */}
+        <div className="mt-2 flex h-[70px] w-[70px] items-center justify-center rounded-xl border border-[#d6b568]/70 bg-white p-1.5 shadow-lg sm:h-[100px] sm:w-[100px] sm:p-2">
+          <QRCodeSVG
+            value={qrValue}
+            size={100}
+            bgColor="#ffffff"
+            fgColor="#071b16"
+            level="H"
+            includeMargin={false}
+            className="h-full w-full"
+          />
+        </div>
+
+        {/* Status */}
+        <span
+          className={`mt-2 max-w-full rounded-full border px-2 py-1 text-center text-[7px] font-bold uppercase tracking-wider sm:px-3 sm:text-[9px] ${
+            status === "active"
+              ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
+              : status === "approved"
+                ? "border-blue-400/40 bg-blue-400/10 text-blue-300"
+                : status === "rejected" || status === "cancelled" || status === "expired"
+                  ? "border-red-400/40 bg-red-400/10 text-red-300"
+                  : "border-amber-400/40 bg-amber-400/10 text-amber-200"
+          }`}
+        >
+          {getStatusText(status)}
+        </span>
+      </div>
+    </div>
+
+    {/* GOLD CHIP AND CERTIFICATION */}
+    <div className="mt-5 border-t border-[#c9a85b]/30 pt-4 sm:mt-7 sm:pt-5">
+
+      <div className="flex items-center gap-3 sm:gap-5">
+
+        {/* Decorative membership chip */}
+        <div className="relative h-8 w-10 shrink-0 overflow-hidden rounded-md border border-[#f0d58a] bg-gradient-to-br from-[#f3df9e] via-[#c7a24b] to-[#8c6824] shadow-md sm:h-11 sm:w-14">
+
+          <div className="absolute left-1/3 top-0 h-full w-px bg-[#8f6b28]/70" />
+
+          <div className="absolute left-2/3 top-0 h-full w-px bg-[#8f6b28]/70" />
+
+          <div className="absolute left-0 top-1/3 h-px w-full bg-[#8f6b28]/70" />
+
+          <div className="absolute left-0 top-2/3 h-px w-full bg-[#8f6b28]/70" />
+
+          <div className="absolute inset-2 rounded-sm border border-[#8f6b28]/60" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-[8px] font-bold uppercase tracking-[0.12em] text-[#d8bd79] sm:text-[10px]">
+            Membership Identification
+          </p>
+
+          <p className="mt-1 text-[8px] leading-relaxed text-white/60 sm:text-[10px]">
+            This card identifies the registered holder within
+            the Celebrity Management fan membership community.
+            Membership privileges are subject to the current
+            membership status and applicable terms.
+          </p>
+        </div>
+      </div>
+
+      {/* FOOTER */}
+      <div className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
+
+        <p className="text-[8px] font-bold uppercase tracking-[0.15em] text-[#d8bd79] sm:text-[10px]">
+          Celebrity Management
+        </p>
+
+        <p className="break-all font-mono text-[7px] text-white/40 sm:text-[9px]">
+          ID: {card.membership_id}
+        </p>
+
+      </div>
+    </div>
+  </div>
+</div>
             </section>
 
             {/* MEMBER INFORMATION */}

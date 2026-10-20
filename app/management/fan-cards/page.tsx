@@ -24,10 +24,16 @@ type Member = {
   email: string | null;
   phone: string | null;
 };
-
+type Celebrity = {
+  id: string;
+  name: string;
+  slug: string;
+  image_url: string | null;
+};
 type FanCard = {
   id: string;
   member_id: string;
+  celebrity_id: string | null;
   membership_id: string;
   membership_level: MembershipLevel;
   status: FanCardStatus;
@@ -39,6 +45,7 @@ type FanCard = {
   notes: string | null;
   created_at: string;
   member: Member[] | null;
+  celebrity: Celebrity[] | null;
 };
 
 const STATUS_OPTIONS: Array<"all" | FanCardStatus> = [
@@ -116,17 +123,17 @@ function statusClasses(status: FanCardStatus) {
 function levelClasses(level: MembershipLevel) {
   switch (level) {
     case "elite":
-      return "bg-black text-white";
+      return "border border-amber-300 bg-black text-amber-300";
 
     case "vip":
-      return "bg-zinc-900 text-white";
+      return "border border-amber-200 bg-amber-50 text-amber-800";
 
     case "premium":
-      return "bg-zinc-200 text-zinc-800";
+      return "border border-emerald-200 bg-emerald-50 text-emerald-800";
 
     case "standard":
     default:
-      return "bg-gray-100 text-gray-600";
+      return "border border-gray-200 bg-gray-100 text-gray-700";
   }
 }
 
@@ -144,52 +151,57 @@ const [errorMessage, setErrorMessage] = useState("");
 
   const [levelFilter, setLevelFilter] =
     useState<"all" | MembershipLevel>("all");
-
-  async function loadFanCards(showRefresh = false) {
-    if (showRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
-    setErrorMessage("");
-
-    const { data, error } = await supabase
-      .from("fan_cards")
-      .select(`
-        id,
-        member_id,
-        membership_id,
-        membership_level,
-        status,
-        issue_date,
-        expiry_date,
-        approved_at,
-        rejection_reason,
-        qr_token,
-        notes,
-        created_at,
-        member:profiles!fan_cards_member_id_fkey(
-          full_name,
-          display_name,
-          email,
-          phone
-        )
-      `)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("FAN CARDS LOAD ERROR:", error);
-
-      setErrorMessage(error.message);
-      setCards([]);
-    } else {
-      setCards((data || []) as FanCard[]);
-    }
-
-    setLoading(false);
-    setRefreshing(false);
+async function loadFanCards(showRefresh = false) {
+  if (showRefresh) {
+    setRefreshing(true);
+  } else {
+    setLoading(true);
   }
+
+  setErrorMessage("");
+
+  const { data, error } = await supabase
+    .from("fan_cards")
+    .select(`
+      id,
+      member_id,
+      celebrity_id,
+      membership_id,
+      membership_level,
+      status,
+      issue_date,
+      expiry_date,
+      approved_at,
+      rejection_reason,
+      qr_token,
+      notes,
+      created_at,
+      member:profiles!fan_cards_member_id_fkey(
+        full_name,
+        display_name,
+        email,
+        phone
+      ),
+      celebrity:celebrities!fan_cards_celebrity_id_fkey(
+        id,
+        name,
+        slug,
+        image_url
+      )
+    `)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("FAN CARDS LOAD ERROR:", error);
+    setErrorMessage(error.message);
+    setCards([]);
+  } else {
+    setCards((data || []) as FanCard[]);
+  }
+
+  setLoading(false);
+  setRefreshing(false);
+}
 
   useEffect(() => {
     loadFanCards();
@@ -229,13 +241,16 @@ const [errorMessage, setErrorMessage] = useState("");
     return cards.filter((card) => {
       const member = getMember(card);
 
-      const matchesSearch =
-        !query ||
-        card.membership_id.toLowerCase().includes(query) ||
-        member?.full_name?.toLowerCase().includes(query) ||
-        member?.display_name?.toLowerCase().includes(query) ||
-        member?.email?.toLowerCase().includes(query) ||
-        member?.phone?.toLowerCase().includes(query);
+     const celebrity = card.celebrity?.[0];
+
+const matchesSearch =
+  !query ||
+  card.membership_id.toLowerCase().includes(query) ||
+  member?.full_name?.toLowerCase().includes(query) ||
+  member?.display_name?.toLowerCase().includes(query) ||
+  member?.email?.toLowerCase().includes(query) ||
+  member?.phone?.toLowerCase().includes(query) ||
+  celebrity?.name?.toLowerCase().includes(query);
 
       const matchesStatus =
         statusFilter === "all" ||
@@ -268,15 +283,15 @@ const [errorMessage, setErrorMessage] = useState("");
   ).length;
 
   return (
-    <div className="min-h-screen bg-[#f6f6f3] text-black">
+    <div className="min-h-screen bg-[#f7f8f5] text-[#111613]">
       {/* HEADER */}
-      <header className="border-b border-black/10 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-5">
+      <header className="border-b border-emerald-900/10 bg-white/95 shadow-sm backdrop-blur">
+        <div className="mx-auto max-w-7xl px-6 py-3">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Link
                 href="/management"
-                className="text-sm font-medium text-gray-500 transition hover:text-black"
+                className="text-sm font-semibold text-emerald-800 transition hover:text-emerald-600"
               >
                 ← Management Dashboard
               </Link>
@@ -296,7 +311,7 @@ const [errorMessage, setErrorMessage] = useState("");
               type="button"
               onClick={() => loadFanCards(true)}
               disabled={refreshing}
-              className="inline-flex items-center justify-center rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex items-center justify-center rounded-xl border border-emerald-800/20 bg-white px-5 py-3 text-sm font-bold text-emerald-900 shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {refreshing ? "Refreshing..." : "Refresh"}
             </button>
@@ -304,7 +319,7 @@ const [errorMessage, setErrorMessage] = useState("");
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
+      <main className="mx-auto max-w-7xl px-6 py-4">
         {/* ERROR */}
         {errorMessage && (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
@@ -346,7 +361,7 @@ const [errorMessage, setErrorMessage] = useState("");
         </div>
 
         {/* FILTERS */}
-        <section className="mt-8 rounded-3xl border border-black/10 bg-white p-5">
+         <section className="mt-5 rounded-2xl border border-emerald-900/10 bg-white p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
             <div className="relative flex-1">
               <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
@@ -357,8 +372,8 @@ const [errorMessage, setErrorMessage] = useState("");
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search member, email or membership ID..."
-                className="w-full rounded-xl border border-black/10 bg-gray-50 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-black focus:bg-white"
+                placeholder="Search member, celebrity, email or membership ID..."
+                className="w-full rounded-xl border border-emerald-900/15 bg-[#f7f8f5] py-3 pl-10 pr-4 text-sm text-[#111613] outline-none transition placeholder:text-gray-400 focus:border-emerald-600 focus:bg-white focus:ring-4 focus:ring-emerald-600/10"
               />
             </div>
 
@@ -371,7 +386,7 @@ const [errorMessage, setErrorMessage] = useState("");
                     | FanCardStatus
                 )
               }
-              className="rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+              className="rounded-xl border border-emerald-900/15 bg-white px-4 py-3 text-sm text-[#111613] outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10"
             >
               {STATUS_OPTIONS.map((status) => (
                 <option key={status} value={status}>
@@ -393,7 +408,7 @@ const [errorMessage, setErrorMessage] = useState("");
                     | MembershipLevel
                 )
               }
-              className="rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+             className="rounded-xl border border-emerald-900/15 bg-white px-4 py-3 text-sm text-[#111613] outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-600/10"
             >
               {LEVEL_OPTIONS.map((level) => (
                 <option key={level} value={level}>
@@ -447,28 +462,31 @@ const [errorMessage, setErrorMessage] = useState("");
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[900px]">
                     <thead>
-                      <tr className="border-b border-black/10 bg-gray-50">
-                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
+                      <tr className="border-b border-emerald-900/10 bg-[#f0f5ef]">
+                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-emerald-800">
                           Member
                         </th>
+                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-emerald-800">
+  Celebrity
+</th>
 
-                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
+                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-emerald-800">
                           Membership ID
                         </th>
 
-                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
+                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-emerald-800">
                           Level
                         </th>
 
-                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
+                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-emerald-800">
                           Status
                         </th>
 
-                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">
+                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-emerald-800">
                           Valid Until
                         </th>
 
-                        <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">
+                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-emerald-800">
                           Action
                         </th>
                       </tr>
@@ -480,7 +498,7 @@ const [errorMessage, setErrorMessage] = useState("");
                           key={card.id}
                           className="border-b border-black/5 last:border-0 hover:bg-gray-50/70"
                         >
-                          <td className="px-6 py-5">
+                          <td className="px-5 py-3">
                             <div>
                               <p className="font-semibold text-gray-900">
                                 {getMemberName(card)}
@@ -491,14 +509,39 @@ const [errorMessage, setErrorMessage] = useState("");
                               </p>
                             </div>
                           </td>
+                          <td className="px-5 py-3">
+  {card.celebrity?.[0] ? (
+    <div className="flex items-center gap-3">
+      {card.celebrity[0].image_url ? (
+        <img
+          src={card.celebrity[0].image_url}
+          alt={card.celebrity[0].name}
+          className="h-10 w-10 rounded-full object-cover"
+        />
+      ) : (
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold">
+          {card.celebrity[0].name.charAt(0)}
+        </div>
+      )}
 
-                          <td className="px-6 py-5">
+      <span className="text-sm font-medium">
+        {card.celebrity[0].name}
+      </span>
+    </div>
+  ) : (
+    <span className="text-sm text-gray-400">
+      No celebrity selected
+    </span>
+  )}
+</td>
+
+                          <td className="px-5 py-3">
                             <span className="font-mono text-sm font-semibold">
                               {card.membership_id}
                             </span>
                           </td>
 
-                          <td className="px-6 py-5">
+                        <td className="px-5 py-3">
                             <span
                               className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize ${levelClasses(
                                 card.membership_level
@@ -508,7 +551,7 @@ const [errorMessage, setErrorMessage] = useState("");
                             </span>
                           </td>
 
-                          <td className="px-6 py-5">
+                          <td className="px-5 py-3">
                             <span
                               className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold capitalize ${statusClasses(
                                 card.status
@@ -523,11 +566,11 @@ const [errorMessage, setErrorMessage] = useState("");
                           </td>
 
                           
-                          <td className="px-6 py-5 text-right">
+                          <td className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-emerald-800">
   <div className="flex justify-end gap-2">
     <Link
       href={`/management/fan-cards/${card.id}`}
-      className="inline-flex rounded-xl bg-black px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-zinc-800"
+      className="inline-flex rounded-xl bg-[#111613] px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-800"
     >
       Review
     </Link>
@@ -536,7 +579,7 @@ const [errorMessage, setErrorMessage] = useState("");
       type="button"
       onClick={() => handleDeleteCard(card.id)}
       disabled={deletingId === card.id}
-      className="inline-flex rounded-xl border border-red-200 px-4 py-2.5 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex rounded-xl bg-[#111613] px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-emerald-800"
     >
       {deletingId === card.id ? "Deleting..." : "Delete"}
     </button>
@@ -554,7 +597,7 @@ const [errorMessage, setErrorMessage] = useState("");
                 {filteredCards.map((card) => (
                   <div
                     key={card.id}
-                    className="rounded-3xl border border-black/10 bg-white p-5"
+                    className="rounded-2xl border border-emerald-900/10 bg-white p-4 shadow-sm transition hover:border-emerald-700/25"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
@@ -575,8 +618,33 @@ const [errorMessage, setErrorMessage] = useState("");
                         {card.status}
                       </span>
                     </div>
+                    <div className="mt-4">
+  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+    Celebrity
+  </p>
 
-                    <div className="mt-5 rounded-2xl bg-gray-50 p-4">
+  {card.celebrity?.[0] ? (
+    <div className="mt-2 flex items-center gap-3">
+      {card.celebrity[0].image_url && (
+        <img
+          src={card.celebrity[0].image_url}
+          alt={card.celebrity[0].name}
+          className="h-10 w-10 rounded-full object-cover"
+        />
+      )}
+
+      <span className="text-sm font-semibold">
+        {card.celebrity[0].name}
+      </span>
+    </div>
+  ) : (
+    <p className="mt-2 text-sm text-gray-400">
+      No celebrity selected
+    </p>
+  )}
+</div>
+
+                    <div className="mt-5 rounded-2xl border border-emerald-900/10 bg-[#f7f8f5] p-4">
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
                         Membership ID
                       </p>
@@ -615,7 +683,7 @@ const [errorMessage, setErrorMessage] = useState("");
                     <div className="mt-5 grid grid-cols-2 gap-3">
   <Link
     href={`/management/fan-cards/${card.id}`}
-    className="flex items-center justify-center rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
+    className="flex items-center justify-center rounded-xl bg-[#111613] px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800"
   >
     Review Fan Card
   </Link>
@@ -650,12 +718,11 @@ function StatCard({
   description: string;
 }) {
   return (
-    <div className="rounded-3xl border border-black/10 bg-white p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-gray-400">
-        {label}
-      </p>
-
-      <p className="mt-3 text-3xl font-semibold tracking-tight">
+    <div className="group rounded-2xl border border-emerald-900/10 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-emerald-700/30">
+     <p className="text-xs font-semibold uppercase tracking-[0.15em] text-emerald-700">
+  {label}
+</p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight">
         {value}
       </p>
 

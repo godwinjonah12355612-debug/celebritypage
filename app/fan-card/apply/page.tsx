@@ -15,11 +15,18 @@ type Profile = {
   country: string | null;
   avatar_url: string | null;
 };
-
+type Celebrity = {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  image_url: string | null;
+};
 type FanCard = {
   id: string;
   member_id: string;
   membership_id: string | null;
+  celebrity_id: string | null;
   membership_level:
     | "standard"
     | "premium"
@@ -83,6 +90,14 @@ export default function FanCardApplyPage() {
 
   const [existingCard, setExistingCard] =
     useState<FanCard | null>(null);
+    const [celebrities, setCelebrities] =
+  useState<Celebrity[]>([]);
+
+const [selectedCelebrityId, setSelectedCelebrityId] =
+  useState("");
+
+const [selectedCelebrity, setSelectedCelebrity] =
+  useState<Celebrity | null>(null);
 
   const [notes, setNotes] = useState("");
 
@@ -141,29 +156,78 @@ export default function FanCardApplyPage() {
     }
 
     setProfile(profileData as Profile);
+    // Read the celebrity slug from the application URL.
+// Example: /fan-card/apply?celebrity=taylor-swift
+const searchParams = new URLSearchParams(
+  window.location.search
+);
+
+const celebritySlug = searchParams.get("celebrity");
+
+// Load active celebrities from Supabase.
+const {
+  data: celebrityData,
+  error: celebrityError,
+} = await supabase
+  .from("celebrities")
+  .select("id, name, slug, category, image_url")
+  .eq("management_status", "active")
+  .order("name", { ascending: true });
+
+if (celebrityError) {
+  console.error(
+    "CELEBRITY LOAD ERROR:",
+    celebrityError
+  );
+
+  setErrorMessage(
+    "We could not load the available celebrities."
+  );
+} else {
+  const availableCelebrities =
+    (celebrityData || []) as Celebrity[];
+
+  setCelebrities(availableCelebrities);
+
+  // Automatically select the celebrity whose profile
+  // the member visited.
+  if (celebritySlug) {
+    const matchedCelebrity =
+      availableCelebrities.find(
+        (item) => item.slug === celebritySlug
+      );
+
+    if (matchedCelebrity) {
+      setSelectedCelebrityId(matchedCelebrity.id);
+      setSelectedCelebrity(matchedCelebrity);
+    }
+  }
+}
 
     const {
-      data: cardData,
-      error: cardError,
-    } = await supabase
-      .from("fan_cards")
-      .select(`
-        id,
-        member_id,
-        membership_id,
-        membership_level,
-        status,
-        issue_date,
-        expiry_date,
-        rejection_reason,
-        notes
-      `)
-      .eq("member_id", user.id)
-      .order("created_at", {
-        ascending: false,
-      })
-      .limit(1)
-      .maybeSingle();
+  data: cardData,
+  error: cardError,
+} = await supabase
+  .from("fan_cards")
+  .select(`
+    id,
+    member_id,
+    membership_id,
+    celebrity_id,
+    membership_level,
+    status,
+    issue_date,
+    expiry_date,
+    rejection_reason,
+    notes
+  `)
+  .eq("member_id", user.id)
+  .order("created_at", {
+    ascending: false,
+  })
+  .limit(1)
+  .maybeSingle();
+      
 
     if (cardError) {
       console.error(
@@ -175,13 +239,38 @@ export default function FanCardApplyPage() {
         "We could not check your fan card application."
       );
     } else if (cardData) {
-      setExistingCard(cardData as FanCard);
-      setNotes(cardData.notes || "");
-    }
+  const existingFanCard = cardData as FanCard;
 
+  setExistingCard(existingFanCard);
+  setNotes(existingFanCard.notes || "");
+
+  // Load the celebrity associated with this fan card.
+  if (existingFanCard.celebrity_id) {
+    const {
+      data: existingCelebrity,
+      error: existingCelebrityError,
+    } = await supabase
+      .from("celebrities")
+      .select("id, name, slug, category, image_url")
+      .eq("id", existingFanCard.celebrity_id)
+      .maybeSingle();
+
+    if (existingCelebrityError) {
+      console.error(
+        "FAN CARD CELEBRITY ERROR:",
+        existingCelebrityError
+      );
+    } else if (existingCelebrity) {
+      const celebrity =
+        existingCelebrity as Celebrity;
+
+      setSelectedCelebrity(celebrity);
+      setSelectedCelebrityId(celebrity.id);
+    }
+  }
+}
     setLoading(false);
   }
-
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>
   ) {
@@ -190,6 +279,14 @@ export default function FanCardApplyPage() {
     setSubmitting(true);
     setErrorMessage("");
     setSuccessMessage("");
+        if (!selectedCelebrityId) {
+      setErrorMessage(
+        "Please select a celebrity for your fan card."
+      );
+
+      setSubmitting(false);
+      return;
+    }
 
     const {
       data: { user },
@@ -262,17 +359,19 @@ export default function FanCardApplyPage() {
       error,
     } = await supabase
       .from("fan_cards")
-      .insert({
+            .insert({
         member_id: user.id,
+        celebrity_id: selectedCelebrityId,
         membership_id: membershipId,
         membership_level: "standard",
         status: "pending",
         notes: notes.trim() || null,
       })
-      .select(`
+            .select(`
         id,
         member_id,
         membership_id,
+        celebrity_id,
         membership_level,
         status,
         issue_date,
@@ -407,11 +506,13 @@ export default function FanCardApplyPage() {
 
           {isActive && (
             <FanCardVisual
-              profile={profile}
-              memberName={displayName}
-              card={existingCard}
-              active
-            />
+  profile={profile}
+  memberName={displayName}
+  card={existingCard}
+  celebrity={selectedCelebrity}
+  active
+/>
+            
           )}
 
           {/* PENDING / APPROVED / REJECTED */}
@@ -420,10 +521,11 @@ export default function FanCardApplyPage() {
             <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
               <div>
                 <FanCardVisual
-                  profile={profile}
-                  memberName={displayName}
-                  card={existingCard}
-                />
+  profile={profile}
+  memberName={displayName}
+  card={existingCard}
+  celebrity={selectedCelebrity}
+/>
               </div>
 
               <div>
@@ -695,7 +797,92 @@ export default function FanCardApplyPage() {
                     "Not provided"
                   }
                 />
+                            </div>
+
+              {/* CELEBRITY SELECTION */}
+
+              <div className="mt-8 border-t border-black/10 pt-7">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/35">
+                  Celebrity Selection
+                </p>
+
+                <h2 className="mt-2 text-xl font-bold">
+                  Choose Your Celebrity
+                </h2>
+
+                <p className="mt-2 text-sm leading-6 text-black/50">
+                  Select the celebrity you want your fan
+                  card to be associated with.
+                </p>
+
+                <select
+                  id="celebrity"
+                  value={selectedCelebrityId}
+                  onChange={(event) => {
+                    const celebrityId =
+                      event.target.value;
+
+                    setSelectedCelebrityId(
+                      celebrityId
+                    );
+
+                    const celebrity =
+                      celebrities.find(
+                        (item) =>
+                          item.id === celebrityId
+                      ) ?? null;
+
+                    setSelectedCelebrity(celebrity);
+                  }}
+                  required
+                  className="mt-4 w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm outline-none focus:border-black"
+                >
+                  <option value="">
+                    Select a celebrity
+                  </option>
+
+                  {celebrities.map((celebrity) => (
+                    <option
+                      key={celebrity.id}
+                      value={celebrity.id}
+                    >
+                      {celebrity.name}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedCelebrity && (
+                  <div className="mt-4 flex items-center gap-4 rounded-2xl border border-black/10 bg-[#fafaf8] p-4">
+                    {selectedCelebrity.image_url ? (
+                      <img
+                        src={selectedCelebrity.image_url}
+                        alt={selectedCelebrity.name}
+                        className="h-16 w-16 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-black text-xl font-bold text-white">
+                        {selectedCelebrity.name.charAt(0)}
+                      </div>
+                    )}
+
+                    <div>
+                      <p className="text-sm font-bold">
+                        {selectedCelebrity.name}
+                      </p>
+
+                      <p className="mt-1 text-xs text-black/45">
+                        {selectedCelebrity.category}
+                      </p>
+
+                      <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-emerald-700">
+                        Selected Celebrity
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* MEMBERSHIP */}
 
               <div className="mt-8 border-t border-black/10 pt-7">
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/35">
@@ -787,11 +974,11 @@ export default function FanCardApplyPage() {
                 Card Preview
               </p>
 
-              <FanCardPreview
+                            <FanCardPreview
                 profile={profile}
                 memberName={displayName}
+                celebrity={selectedCelebrity}
               />
-
               <div className="mt-5 rounded-3xl border border-black/10 bg-white p-6">
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/35">
                   What happens next
@@ -838,9 +1025,11 @@ export default function FanCardApplyPage() {
 function FanCardPreview({
   profile,
   memberName,
+  celebrity,
 }: {
   profile: Profile | null;
   memberName: string;
+  celebrity: Celebrity | null;
 }) {
   return (
     <div className="group relative aspect-auto w-full overflow-hidden rounded-[28px] border-[3px] border-[#8f7228] bg-gradient-to-br from-[#f4f1e7] via-[#e8e4d8] to-[#d8d3c5] shadow-[0_25px_60px_rgba(0,0,0,0.22)] sm:aspect-[1.586/1]">
@@ -967,38 +1156,40 @@ function FanCardPreview({
             />
           </div>
 
-          {/* RIGHT PHOTO / QR */}
+         {/* SELECTED CELEBRITY */}
 
-          <div className="flex flex-col items-center">
-            <div className="aspect-[4/5] w-full overflow-hidden rounded-xl border-2 border-[#8f7228] bg-[#ddd] shadow-md">
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={memberName}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center bg-[#333] text-xl font-black text-white">
-                  {memberName
-                    .charAt(0)
-                    .toUpperCase()}
-                </div>
-              )}
-            </div>
+<div className="flex min-w-0 flex-col items-center">
+  {/* CELEBRITY PHOTO */}
+  <div className="aspect-[4/5] w-full overflow-hidden rounded-xl border-2 border-[#8f7228] bg-[#ddd] shadow-md">
+    {celebrity?.image_url ? (
+      <img
+        src={celebrity.image_url}
+        alt={celebrity.name}
+        className="h-full w-full object-cover"
+      />
+    ) : (
+      <div className="flex h-full items-center justify-center bg-[#333] text-center text-xs font-bold text-white">
+        {celebrity?.name?.charAt(0) || "CM"}
+      </div>
+    )}
+  </div>
 
-            <p className="mt-2 text-center text-[5px] font-bold uppercase leading-tight text-[#555]">
-              QR AVAILABLE
-              <br />
-              AFTER APPROVAL
-            </p>
+  {/* CELEBRITY NAME */}
+  <p className="mt-2 w-full truncate text-center text-[8px] font-black uppercase text-[#444]">
+    {celebrity?.name || "Select Celebrity"}
+  </p>
 
-            <div className="mt-1 flex h-[65px] w-[65px] items-center justify-center bg-white p-2">
-              <div className="flex h-full w-full items-center justify-center border border-dashed border-[#777] text-center text-[6px] font-black uppercase text-[#777]">
-                QR
-                <br />
-                PENDING
-              </div>
-            </div>
+  <p className="mt-1 text-center text-[6px] font-bold uppercase text-[#777]">
+    FEATURED CELEBRITY
+  </p>
+
+  {/* QR PLACEHOLDER */}
+  <div className="mt-2 flex h-[50px] w-[50px] items-center justify-center border border-dashed border-[#8f7228] bg-white text-center text-[7px] font-bold uppercase text-[#777]">
+    QR
+    <br />
+    PENDING
+  </div>
+
           </div>
         </div>
 
@@ -1042,11 +1233,13 @@ function FanCardVisual({
   profile,
   memberName,
   card,
+  celebrity,
   active = false,
 }: {
   profile: Profile | null;
   memberName: string;
   card: FanCard;
+  celebrity: Celebrity | null;
   active?: boolean;
 }) {
   const qrValue =
@@ -1185,42 +1378,75 @@ function FanCardVisual({
             />
           </div>
 
-          {/* PHOTO + QR */}
+          {/* CELEBRITY PHOTO + QR */}
 
-          <div className="flex flex-col items-center">
-            <div className="aspect-[4/5] w-full overflow-hidden rounded-xl border-2 border-[#8f7228] bg-[#ddd] shadow-md">
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={memberName}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center bg-[#333] text-2xl font-black text-white">
-                  {memberName
-                    .charAt(0)
-                    .toUpperCase()}
-                </div>
-              )}
-            </div>
+<div className="flex min-w-0 flex-col items-center">
+  {/* CELEBRITY PHOTO */}
 
-            <p className="mt-2 text-center text-[6px] font-bold uppercase leading-tight text-[#555]">
-              SCAN THE QR CODE TO
-              <br />
-              VERIFY MEMBERSHIP
-            </p>
+  <div className="aspect-[4/5] w-full overflow-hidden rounded-xl border-2 border-[#8f7228] bg-[#ddd] shadow-md">
+    {celebrity?.image_url ? (
+      <img
+        src={celebrity.image_url}
+        alt={celebrity.name}
+        className="h-full w-full object-cover"
+      />
+    ) : (
+      <div className="flex h-full items-center justify-center bg-[#333] text-center text-2xl font-black text-white">
+        {celebrity?.name?.charAt(0) || "CM"}
+      </div>
+    )}
+  </div>
 
-            <div className="mt-1 flex h-[70px] w-[70px] items-center justify-center bg-white p-1 sm:h-[90px] sm:w-[90px]">
-              <QRCodeSVG
-                value={qrValue}
-                size={82}
-                level="H"
-                bgColor="#ffffff"
-                fgColor="#111111"
-                className="h-full w-full"
-              />
-            </div>
-          </div>
+  {/* CELEBRITY NAME */}
+
+  <p className="mt-2 w-full truncate text-center text-[8px] font-black uppercase text-[#444] sm:text-[10px]">
+    {celebrity?.name || "Celebrity"}
+  </p>
+
+  <p className="mt-1 text-center text-[6px] font-bold uppercase leading-tight text-[#555] sm:text-[7px]">
+    FEATURED CELEBRITY
+  </p>
+
+  {/* QR CODE */}
+
+  <p className="mt-2 text-center text-[6px] font-bold uppercase leading-tight text-[#555]">
+    {active ? (
+      <>
+        SCAN TO VERIFY
+        <br />
+        MEMBERSHIP
+      </>
+    ) : (
+      <>
+        MEMBERSHIP
+        <br />
+        VERIFICATION PENDING
+      </>
+    )}
+  </p>
+
+  <div className="mt-1 flex h-[70px] w-[70px] items-center justify-center bg-white p-1 sm:h-[90px] sm:w-[90px]">
+    {active ? (
+      <QRCodeSVG
+        value={JSON.stringify({
+          membershipId: card.membership_id,
+          cardId: card.id,
+        })}
+        size={82}
+        level="H"
+        bgColor="#ffffff"
+        fgColor="#111111"
+        className="h-full w-full"
+      />
+    ) : (
+      <div className="flex h-full w-full items-center justify-center border border-dashed border-[#8f7228] text-center text-[8px] font-bold uppercase text-[#777]">
+        QR
+        <br />
+        PENDING
+      </div>
+    )}
+  </div>
+</div>
         </div>
 
         {/* CHIP / DESCRIPTION */}

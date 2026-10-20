@@ -250,7 +250,7 @@ export default function RegisterPage() {
                   type="tel"
                   value={form.phone}
                   onChange={handleChange}
-                  placeholder="+234..."
+                  placeholder="+1..."
                   autoComplete="tel"
                   className="w-full rounded-xl border border-black/10 bg-[#f6f6f3] px-4 py-3.5 text-sm outline-none transition placeholder:text-black/30 focus:border-black/30 focus:ring-2 focus:ring-black/5"
                 />
